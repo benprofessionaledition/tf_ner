@@ -111,7 +111,7 @@ def model_fn(features, labels, mode, params):
         variable = tf.Variable(variable, dtype=tf.float32, trainable=False)
         word_embeddings = tf.nn.embedding_lookup(variable, word_ids)
 
-    with tf.name_scope("word+char_embeddings"):
+    with tf.name_scope("word_char_embedding_concat"):
         # Concatenate Word and Char Embeddings
         embeddings = tf.concat([word_embeddings, char_embeddings], axis=-1)
         embeddings = tf.layers.dropout(embeddings, rate=dropout, training=training)
