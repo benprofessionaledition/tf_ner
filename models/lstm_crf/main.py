@@ -45,7 +45,7 @@ def input_fn(words, tags, params=None, shuffle_and_repeat=False):
     params = params if params is not None else {}
     shapes = (([None], ()), [None])
     types = ((tf.string, tf.int32), tf.string)
-    defaults = (('<pad>', 0), 'O')
+    defaults = (('<pad>', 0), '<O>')
 
     dataset = tf.data.Dataset.from_generator(
         functools.partial(generator_fn, words, tags),
@@ -68,7 +68,7 @@ def model_fn(features, labels, mode, params):
     vocab_words = tf.contrib.lookup.index_table_from_file(
         params['words'], num_oov_buckets=params['num_oov_buckets'])
     with Path(params['tags']).open() as f:
-        indices = [idx for idx, tag in enumerate(f) if tag.strip() != 'O']
+        indices = [idx for idx, tag in enumerate(f) if tag.strip() != '<O>']
         num_tags = len(indices) + 1
 
     # Word Embeddings
