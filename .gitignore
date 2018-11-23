@@ -243,3 +243,4 @@ fabric.properties
 .idea/workspace.xml
 models/chars_lstm_lstm_crf/results/
 *glove.npz
+/checkpoints/
