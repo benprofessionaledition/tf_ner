@@ -88,7 +88,7 @@ def model_fn(features, labels, mode, params):
     with Path(params['chars']).open() as f:
         num_chars = sum(1 for _ in f) + params['num_oov_buckets']
 
-    with tf.name_scope("character embeddings"):
+    with tf.name_scope("char_embeddings"):
         # Char Embeddings
         char_ids = vocab_chars.lookup(chars)
         variable = tf.get_variable(
@@ -98,20 +98,20 @@ def model_fn(features, labels, mode, params):
                                             training=training)
 
     # Char 1d convolution
-    with tf.name_scope("char conv"):
+    with tf.name_scope("char_conv"):
         weights = tf.sequence_mask(nchars)
         char_embeddings = masked_conv1d_and_max(
             char_embeddings, weights, params['filters'], params['kernel_size'])
 
     # Word Embeddings
-    with tf.name_scope("word embeddings"):
+    with tf.name_scope("word_embeddings"):
         word_ids = vocab_words.lookup(words)
         glove = np.load(params['glove'])['embeddings']  # np.array
         variable = np.vstack([glove, [[0.] * params['dim']]])
         variable = tf.Variable(variable, dtype=tf.float32, trainable=False)
         word_embeddings = tf.nn.embedding_lookup(variable, word_ids)
 
-    with tf.name_scope("word+char embeddings"):
+    with tf.name_scope("word+char_embeddings"):
         # Concatenate Word and Char Embeddings
         embeddings = tf.concat([word_embeddings, char_embeddings], axis=-1)
         embeddings = tf.layers.dropout(embeddings, rate=dropout, training=training)
