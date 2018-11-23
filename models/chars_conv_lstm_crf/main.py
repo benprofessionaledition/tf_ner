@@ -8,19 +8,22 @@ import json
 import logging
 from pathlib import Path
 import sys
-
+import os
 import numpy as np
 import tensorflow as tf
+import time
 from tf_metrics import precision, recall, f1
 
 
 DATADIR = '../../data/ntcir'
 
 # Logging
-Path('results').mkdir(exist_ok=True)
+tstamp = str(time.time())
+base_checkpoint_path = '../../checkpoints/results{}'.format(tstamp)
+Path(base_checkpoint_path).mkdir(exist_ok=True)
 tf.logging.set_verbosity(logging.INFO)
 handlers = [
-    logging.FileHandler('results/main.log'),
+    logging.FileHandler(os.path.join(base_checkpoint_path, 'main.log')),
     logging.StreamHandler(sys.stdout)
 ]
 logging.getLogger('tensorflow').handlers = handlers
@@ -85,45 +88,51 @@ def model_fn(features, labels, mode, params):
     with Path(params['chars']).open() as f:
         num_chars = sum(1 for _ in f) + params['num_oov_buckets']
 
-    # Char Embeddings
-    char_ids = vocab_chars.lookup(chars)
-    variable = tf.get_variable(
-        'chars', [num_chars + 1, params['dim_chars']], tf.float32)
-    char_embeddings = tf.nn.embedding_lookup(variable, char_ids)
-    char_embeddings = tf.layers.dropout(char_embeddings, rate=dropout,
-                                        training=training)
+    with tf.name_scope("character embeddings"):
+        # Char Embeddings
+        char_ids = vocab_chars.lookup(chars)
+        variable = tf.get_variable(
+            'chars', [num_chars + 1, params['dim_chars']], tf.float32)
+        char_embeddings = tf.nn.embedding_lookup(variable, char_ids)
+        char_embeddings = tf.layers.dropout(char_embeddings, rate=dropout,
+                                            training=training)
 
     # Char 1d convolution
-    weights = tf.sequence_mask(nchars)
-    char_embeddings = masked_conv1d_and_max(
-        char_embeddings, weights, params['filters'], params['kernel_size'])
+    with tf.name_scope("char conv"):
+        weights = tf.sequence_mask(nchars)
+        char_embeddings = masked_conv1d_and_max(
+            char_embeddings, weights, params['filters'], params['kernel_size'])
 
     # Word Embeddings
-    word_ids = vocab_words.lookup(words)
-    glove = np.load(params['glove'])['embeddings']  # np.array
-    variable = np.vstack([glove, [[0.] * params['dim']]])
-    variable = tf.Variable(variable, dtype=tf.float32, trainable=False)
-    word_embeddings = tf.nn.embedding_lookup(variable, word_ids)
+    with tf.name_scope("word embeddings"):
+        word_ids = vocab_words.lookup(words)
+        glove = np.load(params['glove'])['embeddings']  # np.array
+        variable = np.vstack([glove, [[0.] * params['dim']]])
+        variable = tf.Variable(variable, dtype=tf.float32, trainable=False)
+        word_embeddings = tf.nn.embedding_lookup(variable, word_ids)
 
-    # Concatenate Word and Char Embeddings
-    embeddings = tf.concat([word_embeddings, char_embeddings], axis=-1)
-    embeddings = tf.layers.dropout(embeddings, rate=dropout, training=training)
+    with tf.name_scope("word+char embeddings"):
+        # Concatenate Word and Char Embeddings
+        embeddings = tf.concat([word_embeddings, char_embeddings], axis=-1)
+        embeddings = tf.layers.dropout(embeddings, rate=dropout, training=training)
 
-    # LSTM
-    t = tf.transpose(embeddings, perm=[1, 0, 2])  # Need time-major
-    lstm_cell_fw = tf.contrib.cudnn_rnn.CudnnCompatibleLSTMCell(params['lstm_size'])
-    lstm_cell_bw = tf.contrib.cudnn_rnn.CudnnCompatibleLSTMCell(params['lstm_size'])
-    lstm_cell_bw = tf.contrib.rnn.TimeReversedFusedRNN(lstm_cell_bw)
-    output_fw, _ = lstm_cell_fw(t, dtype=tf.float32, sequence_length=nwords)
-    output_bw, _ = lstm_cell_bw(t, dtype=tf.float32, sequence_length=nwords)
-    output = tf.concat([output_fw, output_bw], axis=-1)
-    output = tf.transpose(output, perm=[1, 0, 2])
-    output = tf.layers.dropout(output, rate=dropout, training=training)
+    with tf.name_scope("lstm"):
+        # LSTM
+        t = tf.transpose(embeddings, perm=[1, 0, 2])  # Need time-major
+        lstm_cell_fw = tf.contrib.cudnn_rnn.CudnnCompatibleLSTMCell(params['lstm_size'])
+        lstm_cell_bw = tf.contrib.cudnn_rnn.CudnnCompatibleLSTMCell(params['lstm_size'])
+        lstm_cell_bw = tf.contrib.rnn.TimeReversedFusedRNN(lstm_cell_bw)
+        output_fw, _ = lstm_cell_fw(t, dtype=tf.float32, sequence_length=nwords)
+        output_bw, _ = lstm_cell_bw(t, dtype=tf.float32, sequence_length=nwords)
+        output = tf.concat([output_fw, output_bw], axis=-1)
+        output = tf.transpose(output, perm=[1, 0, 2])
+        output = tf.layers.dropout(output, rate=dropout, training=training)
 
-    # CRF
-    logits = tf.layers.dense(output, num_tags)
-    crf_params = tf.get_variable("crf", [num_tags, num_tags], dtype=tf.float32)
-    pred_ids, _ = tf.contrib.crf.crf_decode(logits, crf_params, nwords)
+    with tf.name_scope("crf"):
+        # CRF
+        logits = tf.layers.dense(output, num_tags)
+        crf_params = tf.get_variable("crf", [num_tags, num_tags], dtype=tf.float32)
+        pred_ids, _ = tf.contrib.crf.crf_decode(logits, crf_params, nwords)
 
     if mode == tf.estimator.ModeKeys.PREDICT:
         # Predictions
