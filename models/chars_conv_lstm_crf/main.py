@@ -119,8 +119,8 @@ def model_fn(features, labels, mode, params):
     with tf.name_scope("lstm"):
         # LSTM
         t = tf.transpose(embeddings, perm=[1, 0, 2])  # Need time-major
-        lstm_cell_fw = tf.contrib.cudnn_rnn.CudnnCompatibleLSTMCell(params['lstm_size'])
-        lstm_cell_bw = tf.contrib.cudnn_rnn.CudnnCompatibleLSTMCell(params['lstm_size'])
+        lstm_cell_fw = tf.contrib.rnn.LSTMBlockFusedCell(params['lstm_size'])
+        lstm_cell_bw = tf.contrib.rnn.LSTMBlockFusedCell(params['lstm_size'])
         lstm_cell_bw = tf.contrib.rnn.TimeReversedFusedRNN(lstm_cell_bw)
         output_fw, _ = lstm_cell_fw(t, dtype=tf.float32, sequence_length=nwords)
         output_bw, _ = lstm_cell_bw(t, dtype=tf.float32, sequence_length=nwords)
