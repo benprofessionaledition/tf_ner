@@ -14,7 +14,7 @@ import tensorflow as tf
 from tf_metrics import precision, recall, f1
 
 
-DATADIR = '../../data/example'
+DATADIR = '../../data/ntcir'
 
 # Logging
 Path('results').mkdir(exist_ok=True)
@@ -56,7 +56,7 @@ def input_fn(words, tags, params=None, shuffle_and_repeat=False):
              tf.string)
     defaults = ((('<pad>', 0),
                  ('<pad>', 0)),
-                'O')
+                '<O>')
     dataset = tf.data.Dataset.from_generator(
         functools.partial(generator_fn, words, tags),
         output_shapes=shapes, output_types=types)
@@ -80,7 +80,7 @@ def model_fn(features, labels, mode, params):
     vocab_chars = tf.contrib.lookup.index_table_from_file(
         params['chars'], num_oov_buckets=params['num_oov_buckets'])
     with Path(params['tags']).open() as f:
-        indices = [idx for idx, tag in enumerate(f) if tag.strip() != 'O']
+        indices = [idx for idx, tag in enumerate(f) if tag.strip() != '<O>']
         num_tags = len(indices) + 1
     with Path(params['chars']).open() as f:
         num_chars = sum(1 for _ in f) + params['num_oov_buckets']
@@ -193,9 +193,9 @@ if __name__ == '__main__':
         return str(Path(DATADIR, '{}.tags.txt'.format(name)))
 
     # Estimator, train and evaluate
-    train_inpf = functools.partial(input_fn, fwords('train'), ftags('train'),
+    train_inpf = functools.partial(input_fn, fwords('ntcir_train'), ftags('ntcir_train'),
                                    params, shuffle_and_repeat=True)
-    eval_inpf = functools.partial(input_fn, fwords('testa'), ftags('testa'))
+    eval_inpf = functools.partial(input_fn, fwords('ntcir_test'), ftags('ntcir_test'))
 
     cfg = tf.estimator.RunConfig(save_checkpoints_secs=120)
     estimator = tf.estimator.Estimator(model_fn, 'results/model', cfg, params)
@@ -219,5 +219,5 @@ if __name__ == '__main__':
                     f.write(b' '.join([word, tag, tag_pred]) + b'\n')
                 f.write(b'\n')
 
-    for name in ['train', 'testa', 'testb']:
+    for name in ['ntcir_train', 'ntcir_test']:
         write_predictions(name)
