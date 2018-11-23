@@ -242,3 +242,4 @@ fabric.properties
 .idea/modules.xml
 .idea/workspace.xml
 models/chars_lstm_lstm_crf/results/
+*glove.npz
