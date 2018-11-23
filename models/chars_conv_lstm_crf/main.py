@@ -192,7 +192,7 @@ if __name__ == '__main__':
         'tags': str(Path(DATADIR, 'vocab.tags.txt')),
         'glove': str(Path(DATADIR, 'glove.npz'))
     }
-    with Path('results/params.json').open('w') as f:
+    with Path(base_checkpoint_path + '/params.json').open('w') as f:
         json.dump(params, f, indent=4, sort_keys=True)
 
     def fwords(name):
@@ -207,7 +207,7 @@ if __name__ == '__main__':
     eval_inpf = functools.partial(input_fn, fwords('ntcir_test'), ftags('ntcir_test'))
 
     cfg = tf.estimator.RunConfig(save_checkpoints_secs=120)
-    estimator = tf.estimator.Estimator(model_fn, 'results/model', cfg, params)
+    estimator = tf.estimator.Estimator(model_fn, base_checkpoint_path + '/model', cfg, params)
     Path(estimator.eval_dir()).mkdir(parents=True, exist_ok=True)
     hook = tf.contrib.estimator.stop_if_no_increase_hook(
         estimator, 'f1', 500, min_steps=8000, run_every_secs=120)
@@ -217,8 +217,8 @@ if __name__ == '__main__':
 
     # Write predictions to file
     def write_predictions(name):
-        Path('results/score').mkdir(parents=True, exist_ok=True)
-        with Path('results/score/{}.preds.txt'.format(name)).open('wb') as f:
+        Path(base_checkpoint_path + '/score').mkdir(parents=True, exist_ok=True)
+        with Path(base_checkpoint_path + '/score/{}.preds.txt'.format(name)).open('wb') as f:
             test_inpf = functools.partial(input_fn, fwords(name), ftags(name))
             golds_gen = generator_fn(fwords(name), ftags(name))
             preds_gen = estimator.predict(test_inpf)
