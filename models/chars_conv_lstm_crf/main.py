@@ -19,7 +19,7 @@ DATADIR = '../../data/ntcir'
 
 # Logging
 tstamp = str(time.time())
-base_checkpoint_path = '../../checkpoints/results{}'.format(tstamp)
+base_checkpoint_path = '../../checkpoints/results-lstm-conv-{}'.format(tstamp)
 Path(base_checkpoint_path).mkdir(exist_ok=True)
 tf.logging.set_verbosity(logging.INFO)
 handlers = [
